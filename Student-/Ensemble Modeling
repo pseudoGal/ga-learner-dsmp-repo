@@ -1,0 +1,117 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.linear_model import LinearRegression,LogisticRegression
+from sklearn.model_selection import train_test_split as tts
+from sklearn.metrics import r2_score,accuracy_score,confusion_matrix,classification_report
+import statsmodels.api as sm
+#from imblearn.under_sampling import RandomUnderSampler
+#from imblearn.over_sampling import SMOTE
+import scipy.stats as st
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import GridSearchCV
+from sklearn.preprocessing import MinMaxScaler,StandardScaler
+import statsmodels.formula.api as smf
+from sklearn.model_selection import cross_val_score
+from sklearn.feature_selection import RFE
+#from sklearn.linear_model import Ridge
+#from sklearn.linear_model import Lasso
+from sklearn.metrics import roc_auc_score
+#from sklearn.preprocessing import Imputer,LabelEncoder
+#from sklearn.tree import DecisionTreeClassifier
+#from imblearn.under_sampling import RandomUnderSampler
+#from imblearn.over_sampling import RandomOverSampler
+from sklearn.ensemble import VotingClassifier,BaggingClassifier,RandomForestClassifier
+import statistics as sp
+import warnings
+warnings.filterwarnings("ignore")
+
+
+df = pd.read_csv('diabetes.csv')
+
+X = df.drop(['diabetes'],1)
+y = df['diabetes']
+
+scaler = StandardScaler()
+
+cols =  list(X)
+X = pd.DataFrame(scaler.fit_transform(X),columns=cols)
+
+
+X_train, X_test, y_train, y_test = tts(X, y, test_size = 0.3, random_state = 42)
+
+model1 = DecisionTreeClassifier(random_state=42)
+model2 = KNeighborsClassifier()
+model3 = LogisticRegression(random_state=42)
+
+
+model1.fit(X_train,y_train)
+model2.fit(X_train,y_train)
+model3.fit(X_train,y_train)
+
+
+pred1 = model1.predict(X_test)
+pred2 = model2.predict(X_test)
+pred3 = model3.predict(X_test)
+
+
+final_pred = np.array([])
+for i in range(0,len(X_test)):
+    final_pred = np.append(final_pred,sp.mode([pred1[i],pred2[i],pred3[i]]))
+    
+accuracy_score(y_test,final_pred)
+accuracy_score(y_test,pred1)
+accuracy_score(y_test,pred2)
+accuracy_score(y_test,pred3)
+
+#using Hard voting
+model = VotingClassifier(estimators=[('dtc',model1),('knn',model2),('log',model3)],voting='hard')
+model.fit(X_train,y_train)
+y_pred = model.predict(X_test)
+accuracy_score(y_test,y_pred)
+
+#using Soft voting
+
+model = VotingClassifier(estimators=[('dtc',model1),('knn',model2),('log',model3)],voting='soft')
+model.fit(X_train,y_train)
+y_pred = model.predict(X_test)
+accuracy_score(y_test,y_pred)
+
+bgc2 = BaggingClassifier(base_estimator=model2, n_estimators=200, n_jobs=-1,oob_score=True)
+bgc2.fit(X_train,y_train)
+
+bgc2.score(X_test,y_test)
+
+bgc2.oob_score_
+
+bgc1 = BaggingClassifier(base_estimator=model1, n_estimators=200, n_jobs=-1,oob_score=True)
+bgc1.fit(X_train,y_train)
+
+bgc1.score(X_test,y_test)
+bgc1.oob_score_
+
+bgc3 = BaggingClassifier(base_estimator=model3, n_estimators=200, n_jobs=-1,oob_score=True)
+bgc3.fit(X_train,y_train)
+
+bgc3.score(X_test,y_test)
+bgc3.oob_score_
+
+
+model = VotingClassifier(estimators=[('bgc1',bgc1),('bgc2',bgc2),('bgc3',bgc3)],voting='soft')
+model.fit(X_train,y_train)
+y_pred = model.predict(X_test)
+
+accuracy_score(y_test,y_pred)
+
+rfc = RandomForestClassifier(n_estimators=80,min_samples_split=0.19, random_state=42)
+rfc.fit(X_train,y_train)
+
+rfc.score(X_test,y_test)
+
+
+ok = pd.Series(rfc.feature_importances_, index= list(X))
+
+ok = ok.sort_values(ascending=True)
+
+ok.plot(kind = "barh")
